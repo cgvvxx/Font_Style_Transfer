@@ -81,3 +81,44 @@ class Encoder(tf.keras.Model):
         encode_layers['e7'] = encoded_source
 
         return encoded_source, encode_layers
+
+
+class Decoder(tf.keras.Model):
+    def __init__(self, dec_dim=64):
+        super(Decoder, self).__init__()
+        self.deconv1 = upsample(dec_dim * 8, 5, apply_dropout=True)
+        self.deconv2 = upsample(dec_dim * 8, 5, apply_dropout=True)
+        self.deconv3 = upsample(dec_dim * 8, 4, apply_dropout=True)
+        self.deconv4 = upsample(dec_dim * 4, 4)
+        self.deconv5 = upsample(dec_dim * 2, 4)
+        self.deconv6 = upsample(dec_dim, 4)
+
+        self.initializer = tf.random_normal_initializer(0., 0.02)
+        self.last = tf.keras.layers.Conv2DTranspose(1, 4,
+                                                    strides=2,
+                                                    padding='same',
+                                                    kernel_initializer=self.initializer,
+                                                    activation='tanh')
+
+    def call(self, embedded, encode_layers):
+        x1 = self.deconv1(embedded)
+        x1 = tf.concat([x1, encode_layers['e6']], 3)
+        x2 = self.deconv2(x1)
+        x2 = tf.concat([x2, encode_layers['e5']], 3)
+        x3 = self.deconv3(x2)
+        x3 = tf.concat([x3, encode_layers['e4']], 3)
+        x4 = self.deconv4(x3)
+        x4 = tf.concat([x4, encode_layers['e3']], 3)
+        x5 = self.deconv5(x4)
+        x5 = tf.concat([x5, encode_layers['e2']], 3)
+        x6 = self.deconv6(x5)
+        x6 = tf.concat([x6, encode_layers['e1']], 3)
+        x7 = self.last(x6)
+
+        return x7
+
+
+def Generator(images, En, De, embeddings, embedding_ids):
+    # encoded_source, encode_layers = En(images)
+    # local_embeddings = embedding_lookup(embeddings, embedding_ids)
+    # embedded = tf.concat([encoded_source, local_embeddings], 3)
