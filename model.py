@@ -1,5 +1,6 @@
 import tensorflow as tf
 
+from load_data import embedding_lookup
 
 def downsample(filters, kernel_size=3, apply_batchnorm=True):
     initializer = tf.random_normal_initializer(0., 0.02)
@@ -119,6 +120,35 @@ class Decoder(tf.keras.Model):
 
 
 def Generator(images, En, De, embeddings, embedding_ids):
-    # encoded_source, encode_layers = En(images)
-    # local_embeddings = embedding_lookup(embeddings, embedding_ids)
-    # embedded = tf.concat([encoded_source, local_embeddings], 3)
+    encoded_source, encode_layers = En(images)
+    local_embeddings = embedding_lookup(embeddings, embedding_ids)
+    embedded = tf.concat([encoded_source, local_embeddings], 3)
+    fake_target = De(embedded, encode_layers)
+    if encode_layers:
+        return fake_target, encoded_source, encode_layers
+    else:
+        return fake_target, encoded_source
+
+
+class Discriminator(tf.keras.Model):
+    def __init__(self, cat_num, disc_dim=64):
+        super(Discriminator, self).__init__()
+        self.conv1 = downsample_disc(disc_dim, apply_batchnorm=False)
+        self.conv2 = downsample_disc(disc_dim * 2)
+        self.conv3 = downsample_disc(disc_dim * 4)
+        self.conv4 = downsample_disc(disc_dim * 8)
+        self.dense1 = tf.keras.layers.Dense(1)
+        self.dense2 = tf.keras.layers.Dense(cat_num)
+
+    def call(self, inputs):
+        batch_size = inputs.shape[0]
+        x1 = self.conv1(inputs)
+        x2 = self.conv2(x1)
+        x3 = self.conv3(x2)
+        x4 = self.conv4(x3)
+
+        tf_loss_logit = self.dense1(tf.reshape(x4, shape=[batch_size, -1]))
+        tf_loss = tf.math.sigmoid(tf_loss_logit)
+        cat_loss = self.dense2(tf.reshape(x4, shape=[batch_size, -1]))
+
+        return tf_loss, tf_loss_logit, cat_loss
