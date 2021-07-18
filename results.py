@@ -28,6 +28,32 @@ def add_zero(total_num, idx):
         return str(idx)
 
 
+def set_imgs_shape(pngs):
+      x_shape, y_shape = [], []
+      for png in pngs:
+        x_shape.append(png.shape[0])
+        y_shape.append(png.shape[1])
+      x_min = min(x_shape)
+      y_min = min(y_shape)
+      shaped_pngs = [cv2.resize(png, (y_min, x_min)) for png in pngs]
+
+      return shaped_pngs
+
+
+def png2gif(save_dir, save_name, pngs, fps=20):
+    shaped_pngs = set_imgs_shape(pngs)
+    denormed_pngs = [denormalize_img(png) for png in shaped_pngs]
+    dir = os.path.join(save_dir, save_name)
+    imageio.mimsave(dir, denormed_pngs, fps=fps)
+
+
+def ckpt_list(ckpt_dir):
+    files = glob.glob(os.path.join(ckpt_dir, '*'))
+    ckpt_li = [file[:file.rfind('.')] for file in files if file.endswith(".index")]
+
+    return ckpt_li
+
+
 def ckpt_load(ckpt_dir, data_dir, embedding_name, ckpts=None, ckpt_idx=None, latest=False):
     g_optimizer = tf.keras.optimizers.Adam()
     d_optimizer = tf.keras.optimizers.Adam()
