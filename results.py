@@ -54,6 +54,16 @@ def ckpt_list(ckpt_dir):
     return ckpt_li
 
 
+def char2pngs(ckpt, data_dir, base_dir, embedding_name, font_id_1, font_id_2, grid, char_id):
+    pngs = []
+    for i in np.arange(0, 1, grid):
+        r, f = fixed_img(ckpt, data_dir, base_dir, embedding_name, font_id_1=font_id_1, font_id_2=font_id_2, grid=i,
+                         char_id=char_id)
+        pngs.append(np.float32(f[0, :, :, 0]))
+
+    return pngs
+
+
 def ckpt_load(ckpt_dir, data_dir, embedding_name, ckpts=None, ckpt_idx=None, latest=False):
     g_optimizer = tf.keras.optimizers.Adam()
     d_optimizer = tf.keras.optimizers.Adam()
@@ -136,3 +146,35 @@ def random_plot_save(ckpt, num, data_dir, embedding_name, train_name, save=False
 
         if idx == num:
             break
+
+
+def several_dict(data_dir, font_dict_name):
+
+    font_dict = pd.read_pickle(os.path.join(data_dir, font_dict_name))
+    str_dict = dict(zip([i[idx][:-8] for idx, i in enumerate(font_dict)], range(len(font_dict))))
+    num_dict = dict(zip(range(len(font_dict)), [i[idx][:-8] for idx, i in enumerate(font_dict)]))
+
+    return font_dict, str_dict, num_dict
+
+
+def load_str_img(char_id, base_dir, base_name='NotoSans-Regular/NotoSans-Regular_00'):
+    basic_font = base_name + hex(ord(str(char_id)))[2:].upper() + '.png'
+    img_url = os.path.join(base_dir, basic_font)
+
+    img = imageio.imread(img_url).astype(np.float32)
+    img = normalize_image(img)  # (0,255) -> (-1,1)
+    img = img.reshape(128, 128, 1)
+    img = tf.convert_to_tensor(img, dtype='float32')
+    img = tf.reshape(img, [1, 128, 128, 1])
+
+    return img
+
+
+def find_font_id(tar):
+    if type(tar) == int:
+        return [tar]
+    elif type(tar) == str:
+        return [str_dict[tar]]
+    else:
+        print('type Error!')
+        return None
