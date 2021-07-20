@@ -58,3 +58,46 @@ def get_batch_iter(examples, batch_size, augment, with_charid=True):
           yield [labels, image] 
     
     return batch_iter(with_charid=with_charid)
+class PickledImageProvider(object):
+    def __init__(self, obj_path, verbose):
+        self.obj_path = obj_path
+        self.verbose = verbose
+        self.examples = self.load_pickled_examples()
+
+    def load_pickled_examples(self):
+        with open(self.obj_path, "rb") as of:
+            examples = list()
+            while True:
+                try:
+                    e = pickle.load(of)
+                    examples.append(e)
+                except EOFError:
+                    break
+                except Exception:
+                    pass
+            if self.verbose:
+                print("unpickled total %d examples" % len(examples))
+            return examples
+
+
+class TrainDataProvider(object):
+    def __init__(self, data_dir, train_name, filter_by_font=None, filter_by_charid=None, verbose=True):
+        self.data_dir = data_dir
+        self.train_name = train_name
+        self.filter_by_font = filter_by_font
+        self.filter_by_charid = filter_by_charid
+        self.train_path = os.path.join(self.data_dir, self.train_name)
+        self.train = PickledImageProvider(self.train_path, verbose)
+
+    def get_train_iter(self, batch_size, shuffle=True, with_charid=False):
+        training_examples = self.train.examples[:]
+        if shuffle:
+            np.random.shuffle(training_examples)
+
+        if with_charid:
+            return get_batch_iter(training_examples, batch_size, augment=True, with_charid=True)
+        else:
+            return get_batch_iter(training_examples, batch_size, augment=True)
+
+    def compute_total_batch_num(self, batch_size):
+        return int(np.ceil(len(self.train.examples) / float(batch_size)))
