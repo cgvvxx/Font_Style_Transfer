@@ -22,4 +22,20 @@ def normalize_image(img):  # normalize (0,255) -> (-1,1)
     return normalized
 
 
+def read_split_image(img):
+    mat = imageio.imread(img).astype(np.float)
+    side = int(mat.shape[1] / 2)
+    assert side * 2 == mat.shape[1]
+    img_A = mat[:, :side]
+    img_B = mat[:, side:]
 
+    return img_A, img_B
+
+
+def shift_and_resize_image(img, shift_x, shift_y, nw, nh):
+    w, h = img.shape
+    enlarged = np.array(Image.fromarray(img).resize([nw, nh]))
+    enlarged[np.where(enlarged > 255)] = 255
+    enlarged[np.where(enlarged < 0)] = 0
+
+    return enlarged[shift_x:shift_x + w, shift_y:shift_y + h]
