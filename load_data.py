@@ -101,3 +101,21 @@ class TrainDataProvider(object):
 
     def compute_total_batch_num(self, batch_size):
         return int(np.ceil(len(self.train.examples) / float(batch_size)))
+
+
+def init_embedding(font_total_num, embedding_dim, stddev=0.01):
+    embedding = tf.random.normal([font_total_num, embedding_dim], mean=0, stddev=stddev)
+    embedding = tf.reshape(embedding, shape=[font_total_num, 1, 1, embedding_dim])
+    return embedding
+
+
+def embedding_lookup(embeddings, embedding_ids):
+    batch_size = len(embedding_ids)
+    embedding_dim = embeddings.shape[3]
+    local_embeddings = []
+    for id_ in embedding_ids:
+        local_embeddings.append(embeddings[id_].numpy())
+
+    local_embeddings = tf.convert_to_tensor(np.array(local_embeddings))
+    local_embeddings = tf.reshape(local_embeddings, [batch_size, 1, 1, embedding_dim])
+    return local_embeddings
