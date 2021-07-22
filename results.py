@@ -1,12 +1,17 @@
 import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import glob
 import tensorflow as tf
 import os
 import cv2
 import imageio
 from PIL import Image
+import re
 
 from load_data import TrainDataProvider, embedding_lookup
 from model import Encoder, Decoder, Discriminator
+from utils import normalize_image
 
 
 def denormalize_img(img):
@@ -178,3 +183,114 @@ def find_font_id(tar):
     else:
         print('type Error!')
         return None
+
+
+def fixed_img(ckpt, data_dir, base_dir, embedding_name, font_id_1=0, font_id_2=None, grid=0.5, char_id='a'):
+    embeddings = pd.read_pickle(os.path.join(data_dir, embedding_name))
+    real_src = load_str_img(char_id, base_dir)
+    enc_src, enc_lyr = ckpt.encoder.call(real_src, training=False)
+    if font_id_2:
+        loc_emb_1 = embedding_lookup(embeddings, find_font_id(font_id_1))
+        loc_emb_2 = embedding_lookup(embeddings, find_font_id(font_id_2))
+        loc_emb = loc_emb_1 * (1 - grid) + loc_emb_2 * grid
+    else:
+        loc_emb = embedding_lookup(embeddings, find_font_id(font_id_1))
+    embd = tf.concat([enc_src, loc_emb], 3)
+    fake_tar = ckpt.decoder.call(embd, enc_lyr, training=False)
+
+    return real_src, fake_tar
+
+
+def word2imgs(word, ckpt, data_dir, base_dir, embedding_name, font_id_1=0, font_id_2=None, grid=0.5):
+    imgs = []
+    lower_checks = []
+    for char in word:
+        if char in ['g', 'j', 'p', 'q', 'y']:
+            lower_checks.append(True)
+        else:
+            lower_checks.append(False)
+        real_src, fake_tar = fixed_img(ckpt, data_dir, base_dir, embedding_name, font_id_1=font_id_1, font_id_2=font_id_2, grid=grid,
+                                       char_id=char)
+        imgs.append(fake_tar)
+
+    return imgs, lower_checks
+
+
+def crop_img(img):
+    img_size = img.shape[0]
+    full_white = img_size
+    col_sum = np.where(full_white - np.sum(img, axis=0) > 1)
+    row_sum = np.where(full_white - np.sum(img, axis=1) > 1)
+
+    if np.any((np.diff(col_sum) < np.mean(np.diff(col_sum)))[0]):
+        cleaning_col_sum = np.where((np.diff(col_sum) < np.mean(np.diff(col_sum)))[0])[0]
+        x1, x2 = col_sum[0][cleaning_col_sum[0]], col_sum[0][cleaning_col_sum[-1] + 1]
+    else:
+        col_sum = np.where(full_white - np.sum(img, axis=0) > 1)
+        x1, x2 = col_sum[0][0], col_sum[0][-1]
+
+    if np.any((np.diff(row_sum) < np.mean(np.diff(row_sum)))[0]):
+        cleaning_row_sum = np.where((np.diff(row_sum) < np.mean(np.diff(row_sum)))[0])[0]
+        y1, y2 = row_sum[0][cleaning_row_sum[0]], row_sum[0][cleaning_row_sum[-1] + 1]
+    else:
+        row_sum = np.where(full_white - np.sum(img, axis=1) > 1)
+        y1, y2 = row_sum[0][0], row_sum[0][-1]
+
+    cropped_img = img[y1:y2, x1:x2]
+
+    return cropped_img
+
+
+def cropped_imgs(word_imgs):
+    cropped_imgs = []
+    for img in word_imgs:
+        cropped_imgs.append(crop_img(img[0, :, :, 0]))
+
+    return cropped_imgs
+
+
+def concat_imgs(word_imgs, lower_check, space_size=5, pad_size=20):
+    max_height = max([img.shape[0] for img in word_imgs])
+    padded_imgs = []
+
+    if any(lower_check):
+        del_max_height = max_height // 5
+        max_height += del_max_height
+
+    for idx, (img, check) in enumerate(zip(word_imgs, lower_check)):
+        if len(img) == 0:
+            continue
+        try:
+            pad_value = np.max(img)
+        except:
+            pad_value = 1
+        height, width = img.shape
+        pad_y_height = max_height - height
+        if any(lower_check):
+            if check:
+                pad_y = np.full((pad_y_height, width), pad_value, dtype=np.float32)
+                padded_img = np.concatenate((pad_y, img), axis=0)
+            else:
+                pad_y = np.full((pad_y_height - del_max_height, width), pad_value, dtype=np.float32)
+                padded_img = np.concatenate((pad_y, img), axis=0)
+                pad_y = np.full((del_max_height, width), pad_value, dtype=np.float32)
+                padded_img = np.concatenate((padded_img, pad_y), axis=0)
+        else:
+            pad_y = np.full((pad_y_height, width), pad_value, dtype=np.float32)
+            padded_img = np.concatenate((pad_y, img), axis=0)
+
+        pad_x = np.full((max_height, space_size), pad_value, dtype=np.float32)
+        padded_img = np.concatenate((padded_img, pad_x), axis=1)
+
+        padded_imgs.append(padded_img)
+
+    padded_img = np.concatenate(padded_imgs, axis=1)
+    pad_x = np.full((max_height, pad_size), pad_value, dtype=np.float32)
+    padded_img = np.concatenate((pad_x, padded_img), axis=1)
+    pad_x = np.full((max_height, pad_size - space_size), pad_value, dtype=np.float32)
+    padded_img = np.concatenate((padded_img, pad_x), axis=1)
+    pad_y = np.full((pad_size, padded_img.shape[1]), pad_value, dtype=np.float32)
+    padded_img = np.concatenate((pad_y, padded_img), axis=0)
+    padded_img = np.concatenate((padded_img, pad_y), axis=0)
+
+    return padded_img
