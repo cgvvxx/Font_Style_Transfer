@@ -294,3 +294,29 @@ def concat_imgs(word_imgs, lower_check, space_size=5, pad_size=20):
     padded_img = np.concatenate((padded_img, pad_y), axis=0)
 
     return padded_img
+
+
+def word2img(word, ckpt, data_dir, base_dir, embedding_name, font_id_1=0, font_id_2=None, grid=0.5):
+    each_word_img_list, lower_check = word2imgs(word, ckpt, data_dir, base_dir, embedding_name, font_id_1=font_id_1,
+                                                font_id_2=font_id_2, grid=grid)
+    word_img_lists = cropped_imgs(each_word_img_list)
+    concat_word_img = concat_imgs(word_img_lists, lower_check)
+
+    return concat_word_img
+
+
+def pdf2str(pdf_dir): # Should install PyPDF2
+    reader = PyPDF2.PdfFileReader(pdf_dir)
+    doc = ''
+    for i in range(reader.numPages):
+        doc += reader.getPage(i).extractText()
+        doc += ' '
+
+    return doc
+
+
+def str2word(doc):
+    doc_after = re.sub('[^A-Za-z0-9]', ' ', doc)
+    word_list = list(set(doc_after.split()))
+
+    return word_list
