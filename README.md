@@ -26,7 +26,7 @@ This U-net Architecture is details of Generator. Encoder(Left side) convert inpu
 ![discriminator](image/discriminator.PNG)
 
 ## Results
-TBD ...
+<p align="center"><img src="image/results.gif"></p>
 
 <br></br>
 
@@ -84,7 +84,7 @@ python train.py \
 
 ### Evaluation
 If you want to evaluate generated images and use this evaluation code, prepare 256*128 sized evaluation dataset as below<br>
-![EvaluationExample](image/evaluation_example.png)
+<p align="center"><img src="image/evaluation_example.png"></p>
 
 When you get ready for evaluation, run eval.py
 ```
