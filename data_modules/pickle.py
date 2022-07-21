@@ -15,10 +15,10 @@ def pickle_examples(with_charid=True):
             print('all data num:', len(paths))
             if with_charid:
                 print('pickle with charid')
-                for p in paths:  # p는 해당 png 파일 명
-                    label = c  # 순서대로
+                for p in paths:
+                    label = c 
                     _idx = os.path.basename(p).rfind('_') + 1
-                    charid = int(os.path.basename(p)[_idx:].split(".")[0], 16)  # 0056 -> 86
+                    charid = int(os.path.basename(p)[_idx:].split(".")[0], 16) 
 
                     with open(p, 'rb') as f:
                         img_bytes = f.read()
